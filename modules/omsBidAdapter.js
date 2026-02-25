@@ -8,6 +8,7 @@ import {
   getBidIdParameter,
   getUniqueIdentifierStr,
   formatQS,
+  deepAccess,
 } from '../src/utils.js';
 import {registerBidder} from '../src/adapters/bidderFactory.js';
 import { BANNER, VIDEO } from '../src/mediaTypes.js';
@@ -38,7 +39,7 @@ export const spec = {
 function buildRequests(bidReqs, bidderRequest) {
   try {
     const impressions = bidReqs.map(bid => {
-      let bidSizes = bid?.mediaTypes?.banner?.sizes || bid?.mediaTypes?.video?.playerSize || bid.sizes;
+      let bidSizes = bid?.mediaTypes?.banner?.sizes || bid.sizes || [];
       bidSizes = ((isArray(bidSizes) && isArray(bidSizes[0])) ? bidSizes : [bidSizes]);
       bidSizes = bidSizes.filter(size => isArray(size));
       const processedSizes = bidSizes.map(size => ({w: parseInt(size[0], 10), h: parseInt(size[1], 10)}));
@@ -51,6 +52,7 @@ function buildRequests(bidReqs, bidderRequest) {
 
       const imp = {
         id: bid.bidId,
+        displaymanagerver: '$prebid.version$',
         ext: {
           ...gpidData
         },
@@ -70,6 +72,10 @@ function buildRequests(bidReqs, bidderRequest) {
         imp.video = {
           ...bid.mediaTypes.video,
         }
+      }
+
+      if (deepAccess(bid, 'ortb2Imp.instl') === 1) {
+        imp.instl = 1;
       }
 
       const bidFloor = getBidFloor(bid);
@@ -175,7 +181,6 @@ function interpretResponse(serverResponse) {
           creativeId: bid.crid || bid.id,
           currency: 'USD',
           netRevenue: true,
-          ad: _getAdMarkup(bid),
           ttl: 300,
           meta: {
             advertiserDomains: bid?.adomain || []
@@ -184,8 +189,10 @@ function interpretResponse(serverResponse) {
 
         if (bid.mtype === 2) {
           bidResponse.mediaType = VIDEO;
+          bidResponse.vastXml = bid.adm;
         } else {
           bidResponse.mediaType = BANNER;
+          bidResponse.ad = _getAdMarkup(bid);
         }
 
         return bidResponse;
