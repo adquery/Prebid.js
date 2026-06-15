@@ -962,12 +962,16 @@ describe('adqueryBidAdapter', function () {
       }
     ], { refererInfo: {} })[0]
 
-    it('data with floor must have video bidfloor property', function () {
-      expect(req_video_for_floor.data.imp[0].video.bidfloor).eq(1.13);
+    it('data with floor must have bidfloor property at imp level', function () {
+      expect(req_video_for_floor.data.imp[0].bidfloor).eq(1.13);
     })
 
-    it('data with floor must have video bidfloorcur property', function () {
-      expect(req_video_for_floor.data.imp[0].video.bidfloorcur).eq("USD");
+    it('data with floor must have bidfloorcur property at imp level', function () {
+      expect(req_video_for_floor.data.imp[0].bidfloorcur).eq("USD");
+    })
+
+    it('data with floor must NOT have bidfloor on imp[0].video', function () {
+      expect(req_video_for_floor.data.imp[0].video.bidfloor).to.not.exist;
     })
 
     describe('GDPR and USP consent in banner requests', function () {
@@ -1001,6 +1005,21 @@ describe('adqueryBidAdapter', function () {
           uspConsent: '1YNN'
         })[0];
         expect(req.data.us_privacy).to.equal('1YNN');
+      });
+
+      it('should set gpp and gpp_sid when gppConsent provided', function () {
+        const req = spec.buildRequests([bidRequest], {
+          refererInfo: {},
+          gppConsent: { gppString: 'test-gpp-string', applicableSections: [7, 8] }
+        })[0];
+        expect(req.data.gpp).to.equal('test-gpp-string');
+        expect(req.data.gpp_sid).to.deep.equal([7, 8]);
+      });
+
+      it('should default gpp and gpp_sid to empty when no gppConsent', function () {
+        const req = spec.buildRequests([bidRequest], { refererInfo: {} })[0];
+        expect(req.data.gpp).to.equal('');
+        expect(req.data.gpp_sid).to.deep.equal([]);
       });
     });
 
@@ -1044,6 +1063,24 @@ describe('adqueryBidAdapter', function () {
           uspConsent: '1YNN'
         })[0];
         expect(req.data.regs.ext.us_privacy).to.equal('1YNN');
+      });
+
+      it('should set regs.ext.gdpr=1 even when consentString is absent', function () {
+        const req = spec.buildRequests([minimalVideoBid], {
+          refererInfo: {},
+          gdprConsent: { gdprApplies: true }
+        })[0];
+        expect(req.data.regs.ext.gdpr).to.equal(1);
+        expect(req.data.user).to.be.undefined;
+      });
+
+      it('should set regs.gpp and regs.gpp_sid in video request when gppConsent provided', function () {
+        const req = spec.buildRequests([minimalVideoBid], {
+          refererInfo: {},
+          gppConsent: { gppString: 'test-gpp', applicableSections: [7] }
+        })[0];
+        expect(req.data.regs.gpp).to.equal('test-gpp');
+        expect(req.data.regs.gpp_sid).to.deep.equal([7]);
       });
     });
 
@@ -1209,6 +1246,18 @@ describe('adqueryBidAdapter', function () {
       expect(syncData[0]).to.be.an('object')
       expect(syncData[0].type).to.be.a('string')
       expect(syncData[0].type).to.equal('image')
+    });
+
+    it('should include gpp and gpp_sid in sync URL when gppConsent provided', function () {
+      const sync = spec.getUserSyncs(
+        { pixelEnabled: true },
+        {},
+        null,
+        null,
+        { gppString: 'test-gpp', applicableSections: [7, 8] }
+      );
+      expect(sync[0].url).to.include('gpp=test-gpp');
+      expect(sync[0].url).to.include('gpp_sid=7%2C8');
     });
 
     it('should not include qid in sync URL even when window.qid is set', function () {
