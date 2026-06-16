@@ -65,7 +65,7 @@ export const adqueryIdSubmodule = {
    * @param {SubmoduleConfig} [config]
    * @returns {IdResponse|undefined}
    */
-  getId(config) {
+  getId(config, consentData) {
     logMessage('adqueryIdSubmodule getId');
 
     const qid = storage.getDataFromLocalStorage('qid');
@@ -87,6 +87,12 @@ export const adqueryIdSubmodule = {
       `https://bidder.adquery.io/prebid/qid`,
       config.params.urlArg
     );
+
+    const gdprApplies = consentData?.gdpr?.gdprApplies ? 1 : 0;
+    const consentString = gdprApplies ? (consentData.gdpr.consentString || '') : '';
+    const uspConsent = consentData?.usp || '';
+    const gppString = consentData?.gpp?.gppString || '';
+    const gppSid = consentData?.gpp?.applicableSections?.join(',') || '';
 
     const resp = function (callback) {
       let qid = window.qid;
@@ -121,7 +127,14 @@ export const adqueryIdSubmodule = {
           callback();
         }
       };
-      ajax(url + '?qid=' + qid, callbacks, undefined, { method: 'GET' });
+
+      let requestUrl = `${url}?qid=${qid}&gdpr=${gdprApplies}`;
+      if (consentString) requestUrl += `&gdpr_consent=${consentString}`;
+      if (uspConsent) requestUrl += `&us_privacy=${uspConsent}`;
+      if (gppString) requestUrl += `&gpp=${gppString}`;
+      if (gppSid) requestUrl += `&gpp_sid=${gppSid}`;
+
+      ajax(requestUrl, callbacks, undefined, { method: 'GET' });
     };
     return { callback: resp };
   },

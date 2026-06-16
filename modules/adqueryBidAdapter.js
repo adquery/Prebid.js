@@ -241,15 +241,18 @@ export const spec = {
    * @param {object} syncOptions - Options for synchronization.
    * @param {object[]} serverResponses - Array of server responses.
    * @param {object} gdprConsent - GDPR consent object.
-   * @param {object} uspConsent - USP consent object.
+   * @param {string} uspConsent - USP consent string.
+   * @param {object} gppConsent - GPP consent object.
    * @returns {object[]} - Array of synchronization URLs.
    */
-  getUserSyncs: (syncOptions, serverResponses, gdprConsent, uspConsent) => {
-    logMessage('getUserSyncs', syncOptions, serverResponses, gdprConsent, uspConsent);
+  getUserSyncs: (syncOptions, serverResponses, gdprConsent, uspConsent, gppConsent) => {
+    logMessage('getUserSyncs', syncOptions, serverResponses, gdprConsent, uspConsent, gppConsent);
     const syncData = {
       'gdpr': gdprConsent && gdprConsent.gdprApplies ? 1 : 0,
       'gdpr_consent': gdprConsent && gdprConsent.consentString ? gdprConsent.consentString : '',
-      'ccpa_consent': uspConsent && uspConsent.uspConsent ? uspConsent.uspConsent : '',
+      'ccpa_consent': uspConsent || '',
+      'gpp': gppConsent?.gppString || '',
+      'gpp_sid': gppConsent?.applicableSections?.join(',') || '',
     };
 
     const syncUrlObject = {
@@ -315,12 +318,18 @@ function buildRequest(bid, bidderRequest, isVideo = false) {
     deepSetValue(videoRequest, 'site.ext.bidder', bid.params);
     videoRequest.id = bid.bidId
 
-    if (bidderRequest?.gdprConsent?.consentString) {
+    if (bidderRequest?.gdprConsent) {
       deepSetValue(videoRequest, 'regs.ext.gdpr', bidderRequest.gdprConsent.gdprApplies ? 1 : 0);
-      deepSetValue(videoRequest, 'user.consent', bidderRequest.gdprConsent.consentString);
+      if (bidderRequest.gdprConsent.consentString) {
+        deepSetValue(videoRequest, 'user.consent', bidderRequest.gdprConsent.consentString);
+      }
     }
     if (bidderRequest?.uspConsent) {
       deepSetValue(videoRequest, 'regs.ext.us_privacy', bidderRequest.uspConsent);
+    }
+    if (bidderRequest?.gppConsent?.gppString) {
+      deepSetValue(videoRequest, 'regs.gpp', bidderRequest.gppConsent.gppString);
+      deepSetValue(videoRequest, 'regs.gpp_sid', bidderRequest.gppConsent.applicableSections);
     }
 
     let currency = bid?.ortb2?.ext?.prebid?.adServerCurrency || "PLN";
@@ -338,8 +347,8 @@ function buildRequest(bid, bidderRequest, isVideo = false) {
     const bidfloorcur = floorInfo?.currency;
 
     if (bidfloor && bidfloorcur) {
-      videoRequest.imp[0].video.bidfloor = bidfloor
-      videoRequest.imp[0].video.bidfloorcur = bidfloorcur
+      videoRequest.imp[0].bidfloor = bidfloor
+      videoRequest.imp[0].bidfloorcur = bidfloorcur
     }
 
     return videoRequest
@@ -362,6 +371,8 @@ function buildRequest(bid, bidderRequest, isVideo = false) {
     gdpr: bidderRequest?.gdprConsent?.gdprApplies ? 1 : 0,
     gdpr_consent: bidderRequest?.gdprConsent?.consentString || '',
     us_privacy: bidderRequest?.uspConsent || '',
+    gpp: bidderRequest?.gppConsent?.gppString || '',
+    gpp_sid: bidderRequest?.gppConsent?.applicableSections || [],
   };
 }
 
